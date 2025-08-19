@@ -1,0 +1,86 @@
+def plot_metabolite_exchange(model1, model2, model1_biomass_id, model2_biomass_id, solver, medium=None, undescribed_metabolites_constraint=None, undescribed_met_lb=-0.1, sample_size = 1000, plot = True, retrieve_data = "no", show_max_growth=True):
+    """
+    Plot the exchange of a specific metabolite between two models along the Pareto front.
+    
+    Parameters
+    ----------
+    model1 : cobra.Model
+        First metabolic model
+    model2 : cobra.Model
+        Second metabolic model
+    model1_biomass_id : str
+    model2_biomass_id : str
+    metabolite : str
+        Metabolite ID to plot (without compartment suffix)
+    solver : str
+        Solver to use for optimization
+    medium : pandas.Series, optional
+        Medium composition
+    undescribed_metabolites_constraint : str, optional
+        How to handle metabolites not described in medium
+    undescribed_met_lb : float, optional
+        Lower bound for undescribed metabolites
+    """
+    if medium is None:
+        warnings.warn("No medium specified. Using model's default exchange constraints.")
+    elif undescribed_metabolites_constraint is None:
+        warnings.warn("Using default 'partially_constrained' option for undescribed metabolites.")
+        undescribed_metabolites_constraint = "partially_constrained"
+    
+    metabolic_dict = utils.create_ecosystem_metabolic_dict(model1, model2)
+    
+    # Get solo growth and constrain medium
+    with model1:
+        model1, constrained_medium_dict1 = utils.restrain_medium(model1, medium, undescribed_metabolites_constraint, undescribed_met_lb)
+        solo_growth_model1 = model1.optimize().objective_value
+    with model2:
+        model2, constrained_medium_dict2 = utils.restrain_medium(model2, medium, undescribed_metabolites_constraint, undescribed_met_lb)
+        solo_growth_model2 = model2.optimize().objective_value
+    if solo_growth_model1 == solo_growth_model2 == 0:
+        raise RuntimeError("Both models had a null objective value when modeled alone in the given medium."+
+                           " To enable this analysis, you need to adjust the medium or models. You can also"+
+                           " try to lighten the medium constraint by using the \"partially_constrained\""+
+                           " option for the undescribed_metabolites_constraint argument.") 
+    elif solo_growth_model1 == 0 or solo_growth_model2 == 0:
+        warnings.warn("One model had a null objective value when modeled alone in the given medium."+
+                      " If this is not an expected result, you might want to use the \"partially_constrained\""+
+                      " option for the undescribed_metabolites_constraint argument, or redefine your medium or model.")
+    
+    medium_dict = {**constrained_medium_dict1, **constrained_medium_dict2}
+    model1 = utils.unrestrain_medium(model1)
+    model2 = utils.unrestrain_medium(model2)
+    
+    # Get Pareto front and ecosystem model
+    sol_mofba, ecosys = utils.mo_fba(model1, model2, metabolic_dict, medium_dict)
+    xy, maxi_model1, maxi_model2 = utils.pareto_parsing(sol_mofba, solo_growth_model1, solo_growth_model2)
+    
+    # Convert to cobra model and sample Pareto front
+    cobra_ecosys = utils.mocba_to_cobra(ecosys)
+    cobra_ecosys.solver = solver
+    model1_id = model1.id
+    model2_id = model2.id
+    
+    #biomass_id verification
+    if model1_biomass_id is None:
+        raise ValueError("You must provide model1_biomass_id.")
+    if model2_biomass_id is None:
+        raise ValueError("You must provide model2_biomass_id.")  
+        
+    sampling = utils.pareto_sampling(
+        cobra_ecosys, xy, solo_growth_model1, solo_growth_model2, 
+        model1.id, model2.id, model1_biomass_id, model2_biomass_id, 
+        sample_size=sample_size
+    ) 
+    
+    # Plot the specific metabolite
+    utils.plot_specific_metabolite_exchange(model1, sampling, metabolite, model1_id, model2_id, show_plot=False)
+    
+    if show_max_growth:
+        growth_text = (f"Max growth - {model1.id} : {solo_growth_model1:.2f}, {model2.id}: {solo_growth_model2:.2f}")
+        plt.figtext(0.5, 0.01, growth_text, ha='center', va='bottom', fontsize=10, bbox={'facecolor':'white', 'alpha':0.8, 'pad':5})
+    plt.tight_layout()
+    plt.legend()
+    plt.show()
+    
+    if retrieve_data == "yes":
+        return utils.extract_sampling_data2(model1, sampling, metabolite, model1_id, model2_id)
