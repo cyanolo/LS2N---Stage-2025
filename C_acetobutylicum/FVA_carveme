@@ -1,0 +1,116 @@
+import cobra
+from cobra.io import read_sbml_model 
+model = read_sbml_model("/home/stagiaire-combi/Stage/bacteries_modelisees_trouvees/c_acetobutylicum_ATCC824_iCac802.xml/c_acetobutylicum_ATCC824/ncbi_dataset/GCF_000008765.1/c_ace_carveme.xml")
+model.reactions.EX_o2_e.lower_bound = 0
+
+allowed_exchanges = {
+    "EX_h_e" : (-10,1000), #proton
+    "EX_nh3_e" : (-10,1000), #nh3
+    "EX_nh4_e" : (-10,1000), #nh4
+    "EX_pi_e" : (-10,1000), #phosphate
+    "EX_glc__D_e" : (-10,1000), #glucose
+    "EX_but_e" : (-10,0), #butyrate
+    "EX_so4_e" : (-10,1000), #sulfate
+    "EX_h2o_e" : (-10,1000), #h2o
+    "EX_co2_e" : (-10,1000), #co2
+    "EX_ac_e" : (-10,0), #acetate
+    "EX_n2_e" : (-10,1000), #n2
+    #ajoutés par rapport à iCac802
+    "EX_mn2_e" : (-1,1000), #mn2
+    "EX_zn2_e" : (-1, 1000), #zn2
+    "EX_ni2_e" : (-1, 1000), #ni2
+    "EX_fe3_e" : (-1,1000), #fe3
+    "EX_na1_e" : (-1,1000), #na+
+    "EX_ca2_e0" : (-1,1000), #ca2
+    "EX_cu2_e" : (-1,1000), #cu2
+    "EX_fe2_e" : (-1,1000), #fe2
+    "EX_k_e" : (-1,1000), #k+
+    "EX_cl_e" : (-1,1000), #chlorure
+    "EX_mg2_e" : (-1,1000), #Mg
+    "EX_cobalt2_e" : (-1, 1000),
+    #ajoutés par rapport à gapseq
+    "EX_thm_e" : (-1,1000),
+    "EX_btn_e" : (-1,1000), 
+    "EX_bz_e" : (-1,1000),
+    "EX_3amp_e" : (-0.5, 1000),
+    "EX_3cmp_e" : (-0.5, 1000),
+    "EX_LalaDgluMdap_e" : (-0.5, 1000),
+    "EX_ala_his_e " : (-0.5, 1000),
+    "EX_arg__L_e" : (-0.5, 1000),
+    "EX_fol_e" : (-0.5, 1000),
+    "EX_g3ps_e" : (-0.5, 1000),
+    "EX_gly_asn__L_e" : (-0.5, 1000),
+    "EX_gly_met_e" : (-0.5, 1000),
+    "EX_glyglygln_e" : (-0.6, 1000),
+    "EX_lysglugly_e" : (-0.5, 1000),
+    "EX_malthx_e" : (-3, 1000),
+    "EX_no3_e" : (-0.5, 1000),
+    "EX_istfrnB_e" : (-0.5, 1000),
+    "EX_ribflv_e" : (-0.5, 1000)
+    
+}
+
+for rxn in model.reactions:
+    if rxn.id.startswith("EX_"):
+        if rxn.id in allowed_exchanges:
+            rxn.lower_bound, rxn.upper_bound = allowed_exchanges[rxn.id]
+        else:
+            rxn.lower_bound = 0.0
+
+from cobra.flux_analysis import flux_variability_analysis
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_fva_vs_mfa(model, reactions, exp_values, names=None, title='Carveme vs MFA', xscale='log', xlim=(0.001, 100), xticks=None, figsize=(10, 8), **kwargs):
+    fva = flux_variability_analysis(model, reaction_list=reactions)
+    names = names[::-1] if names else reactions[::-1]
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xscale(xscale)
+    
+    # Set default ticks only if not provided and scale is log
+    if xticks is None and xscale == 'log':
+        xticks = [0.001, 0.01, 0.1, 1, 10, 100]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(['10⁻³', '10⁻²', '10⁻¹', '10⁰', '10¹', '10²'])
+    elif xticks is not None:
+        ax.set_xticks(xticks)
+    
+    ax.set_xlim(*xlim)
+    
+    # Plotting
+    for i, (name, vmin, vmax, exp) in enumerate(zip(names, fva.minimum.values[::-1], fva.maximum.values[::-1], exp_values[::-1])):
+        ax.hlines(i, vmin, vmax, color=kwargs.get('fva_color', 'skyblue'), lw=kwargs.get('linewidth', 5), alpha=0.7, label='FVA' if i==0 else "")
+        ax.plot([vmin, vmax], [i, i], 'o', color='navy', ms=kwargs.get('markersize', 5))
+        ax.scatter(exp, i, color=kwargs.get('exp_color', 'red'), s=100, label='MFA' if i==0 else "")
+    
+    ax.axvline(xlim[0], color='gray', ls='--', lw=0.5)
+    ax.set_yticks(range(len(names)))
+    ax.set_yticklabels(names)
+    ax.set_xlabel('Flux (mmol/gCDW/h)')
+    ax.set_title(title or f'FVA vs MFA')
+    ax.grid(True, axis='x', ls='--')
+    ax.legend()
+    plt.tight_layout()
+    return fig, ax
+
+def plot_fva(model, reactions, names=None, **kwargs):
+    dummy_values = [np.nan] * len(reactions)
+    return plot_fva_vs_mfa(model, reactions, dummy_values, names, **kwargs)
+
+model.reactions.Growth.lower_bound = 0.07
+model.reactions.Growth.upper_bound = 0.07
+
+reactions = ["Growth", "FUM", "ASPT", "ICDHx", "ASPTA", "CS", "PTAr", "PC", "PYK" ,"ENO", "GAPD", "TPI", "FBA", "PFK", "PGI", "HEX1"]
+exp_values = [0.07, 0.1, 0.1, 0.5, 0.8, 0.5, 12, 0.9, 14, 14, 14, 10, 10, 10, 10, 10]
+names = ["Growth", "FH", "ASPA", "IDH", "AST", "CS", "PTA", "PC", "PYK", "ENO", "GAPDH", "TPI", "ALD", "PFK", "GPI", "HK"]
+plot_fva_vs_mfa(model, reactions, exp_values, names, Title="carveme vs MFA")
+plot_fva_vs_mfa(model, reactions, exp_values, names, Title="carveme vs MFA", xscale='linear', xlim=(-100, 100))
+
+reactions = ["EX_h2_e", "EX_but_e", "EX_ac_e", "EX_etoh_e", "EX_but_e"]
+exp_values = [12, 0.9, 14, 14, 10, 10, 10, 10]
+names = ["hydrogene", "butyrate", "acetate", "ethanol", "butanol"]
+plot_fva(model, reactions, names, Title="carveme vs MFA")
+plot_fva(model, reactions, names, Title="carveme vs MFA", xscale='linear', xlim=(-100, 100))
+plt.show()
