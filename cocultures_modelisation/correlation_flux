@@ -1,0 +1,38 @@
+import pandas as pd 
+import numpy as np
+from scipy.stats import spearmanr
+import seaborn as sns 
+import matplotlib.pyplot as plt 
+
+df = pd.read_csv('/home/stagiaire-combi/Stage/vscodium/souches_athena/mets_crossfed_cb_ct_10000', index_col=0)
+
+# Extraire subset dataframe C.butyricum x C.tertium
+cb_cols = [col for col in df.columns if ":Cb" in col]
+ct_cols = [col for col in df.columns if ":Ct" in col]
+pool_cols = [col for col in df.columns if ":pool" in col]
+biomass_cols = [col for col in corr_df.columns if col.startswith('EX_cpd11416_c0')]
+metab_rows = [idx for idx in corr_df.index if idx.startswith('EX_cpd11640_e0')]
+df_cb = df[cb_cols].rename(columns=lambda x: x.replace(":Cb", ""))
+df_ct = df[ct_cols].rename(columns=lambda x: x.replace(":Ct", ""))
+df_pool = df[pool_cols].rename(columns=lambda x: x.replace(":pool", ""))
+  
+# Extract the submatrix
+corr_subset = corr_df.loc[metab_rows, biomass_cols]
+
+corr_matrix, p_values = spearmanr(df, axis=0)
+corr_df = pd.DataFrame(corr_matrix, index=df.columns, columns=df.columns)
+central_metabolism = [col for col in df.columns if col.startswith(('EX_cpd', 'rxn'))]
+corr_subset = corr_df.loc[central_metabolism, central_metabolism]
+corr_clean = corr_subset.dropna(axis=0, how='all').dropna(axis=1, how='all')
+strong_corr = corr_clean[corr_clean.abs() > 0.95].dropna(how='all', axis=0).dropna(how='all', axis=1)
+strong_corr_clean = strong_corr.dropna(axis=0, how='all').dropna(axis=1, how='all')
+
+targets = ["EX_cpd11640_e0:Ct", "EX_cpd11640_e0:pool", "EX_cpd11416_c0:Ct", "EX_cpd11416_c0:Lm", "EX_cpd11416_c0:pool"]
+threshold = 0.85  # Seuil minimal de corrélation 
+corr_with_targets = strong_corr_clean[targets].copy()
+significant_corr = corr_with_targets[(np.abs(corr_with_targets) > threshold).any(axis=1)]
+filtered_corr = corr_subset.loc[significant_corr.index, targets + list(significant_corr.index)]
+final_df = filtered_corr.dropna(how='all', axis=0).dropna(how='all', axis=1)
+final_df
+
+final_df.to_csv("0_85_correlation_ct_lm_1000.csv")
