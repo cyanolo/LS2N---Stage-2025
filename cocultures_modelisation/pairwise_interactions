@@ -1,0 +1,63 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
+
+data = {
+    'With Cb': [None, 1, 1, -1, 1], #1 if the interaction benefits the growth of the strain/ -1 if it impacts it
+    'With Ct': [1, None, 1, -1, 1],
+    'With Lm': [1, -1, None, -1, -1],
+    'With Pb': [1, 1, 1, None, 1],
+    'With Eh': [1, 1, -1, -1, None],
+}
+index = ['Clostridium butyricum', 'Clostridium tertium', 'Limosilactobacillus mucosae', 'Paraclostridium bifermentans', 'Enterococcus hirae']
+df = pd.DataFrame(data, index=index)
+
+sns.set_style("white")  # Style blanc de Seaborn
+plt.rcParams['font.family'] = 'DejaVu Sans'
+cmap = ListedColormap(['#FF6B6B', '#CCCCCC', '#5D9B9B'])  # Rouge, Gris, Bleu vert
+bounds = [-1.5, -0.5, 0.5, 1.5]
+norm = plt.Normalize(vmin=-1.5, vmax=1.5)
+
+plt.figure(figsize=(12, 8))
+
+sns.heatmap(
+    df.replace({None: np.nan}),
+    cmap=cmap,
+    norm=norm,
+    annot=False,
+    cbar=False,
+    linewidths=0.6,
+    linecolor='white',
+    square=True
+)
+
+plt.ylabel('Tested organism', fontsize=20, labelpad=15)
+plt.xlabel('In co-culture with', fontsize=20, labelpad=15)
+plt.yticks(rotation=0, fontsize=20)
+plt.xticks(rotation=45, ha='right', rotation_mode='anchor', fontsize=20)
+
+legend_elements = [
+    Patch(facecolor='#FF6B6B', edgecolor='w', label='Growth inhibition'),
+    Patch(facecolor='#CCCCCC', edgecolor='w', label='Neutral'),
+    Patch(facecolor='#5D9B9B', edgecolor='w', label='Growth promotion'),
+]
+
+plt.legend(
+    handles=legend_elements,
+    bbox_to_anchor=(1.05, 1),
+    loc='upper left',
+    frameon=True,
+    framealpha=1,
+    edgecolor='black',
+    title='Interaction',
+    title_fontsize=20,
+    fontsize=20
+)
+
+#plt.title('Effects of pairwise co-cultures on bacterial growth', pad=20, fontsize=14)
+plt.tight_layout()
+#plt.savefig('heatmap_interactions.png', dpi=300, bbox_inches='tight')
+plt.show()
