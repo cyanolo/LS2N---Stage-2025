@@ -1,0 +1,62 @@
+import cobra
+from cobra.io import read_sbml_model 
+model = read_sbml_model("/home/stagiaire-combi/Stage/bacteries_modelisees_trouvees/c_acetobutylicum_ATCC824_iCac802.xml/iCac802.xml")
+from cobra.flux_analysis import flux_variability_analysis
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_fva_vs_mfa(model, reactions, exp_values, names=None, title=None, biomass=0.07, xscale='log', xlim=(0.001, 100), xticks=None, figsize=(10, 8), **kwargs):
+    fva = flux_variability_analysis(model, reaction_list=reactions)
+    names = names[::-1] if names else reactions[::-1]
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xscale(xscale)
+    
+    # Set default ticks only if not provided and scale is log
+    if xticks is None and xscale == 'log':
+        xticks = [0.001, 0.01, 0.1, 1, 10, 100]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(['10⁻³', '10⁻²', '10⁻¹', '10⁰', '10¹', '10²'])
+    elif xticks is not None:
+        ax.set_xticks(xticks)
+    
+    ax.set_xlim(*xlim)
+    
+    # Plotting
+    for i, (name, vmin, vmax, exp) in enumerate(zip(names, fva.minimum.values[::-1], fva.maximum.values[::-1], exp_values[::-1])):
+        ax.hlines(i, vmin, vmax, color=kwargs.get('fva_color', 'skyblue'), lw=kwargs.get('linewidth', 5), alpha=0.7, label='FVA' if i==0 else "")
+        ax.plot([vmin, vmax], [i, i], 'o', color='navy', ms=kwargs.get('markersize', 5))
+        ax.scatter(exp, i, color=kwargs.get('exp_color', 'red'), s=100, label='MFA' if i==0 else "")
+    
+    ax.axvline(xlim[0], color='gray', ls='--', lw=0.5)
+    ax.set_yticks(range(len(names)))
+    ax.set_yticklabels(names)
+    ax.set_xlabel('Flux (mmol/gCDW/h)')
+    ax.set_title(title or f'FVA vs MFA | Biomass = {biomass} mmol/gDW/h')
+    ax.grid(True, axis='x', ls='--')
+    ax.legend()
+    plt.tight_layout()
+    return fig, ax
+
+def plot_fva(model, reactions, names=None, **kwargs):
+    dummy_values = [np.nan] * len(reactions)
+    return plot_fva_vs_mfa(model, reactions, dummy_values, names, **kwargs)
+
+model.reactions.Biomass.lower_bound = 0.07
+model.reactions.Biomass.upper_bound = 0.07
+model.reactions.Ex_91.lower_bound = -10 
+model.reactions.Ex_91.upper_bound = -10
+
+reactions = ["Biomass", "R1590", "R1153", "R0568", "R0343", "R0368", "R1489", "R0599", "R0986", "R0379", "R0243", "R0236", "R0241", "R1373", "R0146", "R0992", "R0943"]
+exp_values = [0.07, 0.2, 0.1, 0.1, 0.5, 0.8, 0.5, 12, 0.9, 14, 14, 14, 10, 10, 10, 10, 10]
+names = ["Growth", "SCS", "FH", "ASPA", "IDH", "AST", "CS", "PTA", "PC", "PYK", "ENO", "GAPDH", "TPI", "ALD", "PFK", "GPI", "HK"]
+plot_fva_vs_mfa(model, reactions, exp_values, names, title="iCac802 vs MFA")
+plot_fva_vs_mfa(model, reactions, exp_values, names, title="iCac802 vs MFA", xscale='linear', xlim=(-100, 100))
+plt.show()
+
+reactions = ["Ex_116", "Ex_96", "Ex_104", "Ex_111", "Ex_113", "Ex_110"]
+names = ["hydrogen", "butyrate", "acetate", "ethanol", "butanol", "acetone"]
+plot_fva(model, reactions, names, title="iCac802 vs MFA")
+plot_fva(model, reactions, names, title="iCac802 vs MFA", xscale='linear', xlim=(-100, 100))
+plt.show()
