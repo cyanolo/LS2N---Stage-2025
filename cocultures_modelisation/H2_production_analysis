@@ -1,0 +1,40 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+df = pd.read_csv('/home/stagiaire-combi/Stage/vscodium/souches_athena/h2_sampling_cb_ct_10000_0.1.csv', sep=';', decimal=',')
+import matplotlib.pyplot as plt
+
+#H2 production of Clostridium tertium with C. butyricul - data extracted from the coculture matrix
+#10,000 samples et 1% margin 
+fig, ax1 = plt.subplots(figsize=(12, 6))
+
+color = 'tab:red'
+ax1.set_ylabel('Growth of Ct in coculture with Cb', color=color, fontsize=20)
+ax1.plot(df['obj_value_model2'], color=color)
+ax1.tick_params(axis='y', labelcolor=color, labelsize=20)
+ax1.tick_params(axis='x', labelsize=15)  # Taille des ticks x
+
+ax2 = ax1.twinx()
+color = 'midnightblue'
+ax2.set_ylabel('H₂ production flux of Ct', color=color, fontsize=20)
+ax2.plot(df['EX_cpd11640_e0:Ct'], color=color, alpha=0.7)
+ax2.tick_params(axis='y', labelcolor=color, labelsize=20)
+plt.title('Ct - Relation between growth and H2 production (10000 samples) in coculture with Cb', fontsize=15)
+plt.show()
+
+#H2 production of Clostridium butyricum with C. tertium - data extracted from the coculture matrix
+#10,000 samples et 1% margin 
+fig, ax1 = plt.subplots(figsize=(12, 6))
+
+color = 'tab:red'
+ax1.set_ylabel('Growth of Cb in coculture with Ct', color=color, fontsize=20)
+ax1.plot(df['obj_value_model1'], color=color)
+ax1.tick_params(axis='y', labelcolor=color, labelsize=15)
+ax1.tick_params(axis='x', labelsize=20)  # Taille des ticks x
+
+ax2 = ax1.twinx()
+color = 'midnightblue'
+ax2.set_ylabel('H₂ production flux of Cb', color=color, fontsize=20)
+ax2.plot(df['EX_cpd11640_e0:Cb'], color=color, alpha=0.7)
+ax2.tick_params(axis='y', labelcolor=color, labelsize=20)
+plt.title('Cb - Relation between growth and H2 production (10000 samples) in coculure with Ct')
+plt.show()
