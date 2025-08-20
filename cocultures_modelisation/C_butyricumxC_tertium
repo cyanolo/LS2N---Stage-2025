@@ -1,0 +1,54 @@
+import cobra
+import gurobipy
+import mimeco
+from mimeco import analysis
+import pandas as pd
+
+#medium without lactic acid
+medium = pd.read_csv("/home/stagiaire-combi/logiciels/gapseq/C.acetobutylicum/medium/medium_mimeco_cpd_lcts2.csv", index_col=0) "
+model2 = cobra.io.read_sbml_model("/home/stagiaire-combi/Souches_coesion/Cb_gapseq/Cb_gs.xml")
+model3 = cobra.io.read_sbml_model("/home/stagiaire-combi/Souches_coesion/Ct_gapseq/Ct_gs.xml")
+model2.id = "Cb"
+model3.id = "Ct"
+models_list = [model2, model3]
+
+for model in models_list:
+    model.solver = "gurobi"
+
+model2_biomass_id = "EX_cpd11416_c0"
+model3_biomass_id = "EX_cpd11416_c0"
+
+#Interaction score
+int_score, int_type = analysis.interaction_score_and_type(model2, model3, medium, undescribed_metabolites_constraint="blocked", plot=True)
+print("interaction score: ",int_score)
+print("interaction type: ",int_type)
+
+#Margin of 1% at the Pareto front
+from copy import deepcopy
+model2_constrained = deepcopy(model2)
+model3_constrained = deepcopy(model3)
+max_bio2 = model2.optimize().objective_value
+max_bio3 = model3.optimize().objective_value
+model2_constrained.reactions.EX_cpd11416_c0.bounds = (0.99 * max_bio2, max_bio2)
+model3_constrained.reactions.EX_cpd11416_c0.bounds = (0.99 * max_bio3, max_bio3)
+
+#Metabolites cross-fed - 10,000 samplings
+potential_exchange, sampling = analysis.crossfed_metabolites(model1 = model2_constrained, model2 = model3_constrained, medium = medium, undescribed_metabolites_constraint = "blocked", solver = "gurobi", model1_biomass_id = model2_biomass_id, model2_biomass_id = model3_biomass_id, sample_size = 10000, plot = True, retrieve_data = "all")
+potential_exchange
+
+#H_2 production analysis
+sampling_data = analysis.plot_metabolite_exchange(
+    model1=model2_constrained,
+    model2=model3_constrained,
+    model1_biomass_id=model2_biomass_id, 
+    model2_biomass_id=model3_biomass_id,
+    metabolite="cpd11640",
+    solver="gurobi",
+    medium=medium,
+    undescribed_metabolites_constraint = "blocked",
+    sample_size = 10000,
+    plot=True,
+    retrieve_data = "yes",
+    show_max_growth = True
+)
+
